@@ -1,15 +1,14 @@
-import torch
 import json
-from torch import nn
-from torch.utils.data import DataLoader
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-from torch.utils.data import Dataset
-import pandas as pd
-import matplotlib.pyplot as plt
 import pickle
 
-
+import matplotlib.pyplot as plt
+import pandas as pd
+import torch
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+# Note: Here I used the wrong term "validation" instead of "validation" so it should be renamed.
 # define constants
 learning_rate = 1
 batch_size = 50
@@ -76,7 +75,7 @@ class CustomImageDataset(Dataset):
 
 # parse the json file for the tensors
 train_input_tensor, train_target_tensor = parse_json_file("train_dataset.json")
-test_input_tensor, test_target_tensor = parse_json_file("test_dataset.json")
+validation_input_tensor, validation_target_tensor = parse_json_file("validation_dataset.json")
 
 # get the mean and std of the input and target tensors from ONLY the training data. This important that we use the training data only to
 # calculate the mean and std so that the scale of the standardized data is consistent
@@ -95,12 +94,12 @@ standardized_training_input_tensor = standardize_data(
 standardized_training_target_tensor = standardize_data(
     train_target_tensor, target_mean, target_std
 )
-# standardized TEST data
-standardized_test_input_tensor = standardize_data(
-    test_input_tensor, input_mean, input_std
+# standardized validation data
+standardized_validation_input_tensor = standardize_data(
+    validation_input_tensor, input_mean, input_std
 )
-standardized_test_target_tensor = standardize_data(
-    test_target_tensor, target_mean, target_std
+standardized_validation_target_tensor = standardize_data(
+    validation_target_tensor, target_mean, target_std
 )
 
 
@@ -109,19 +108,19 @@ train_mb3Dataset = CustomImageDataset(
     standardized_training_input_tensor, standardized_training_input_tensor
 )
 
-test_mb3Dataset = CustomImageDataset(
-    standardized_test_input_tensor, standardized_test_target_tensor
+validation_mb3Dataset = CustomImageDataset(
+    standardized_validation_input_tensor, standardized_validation_target_tensor
 )
 
 
 # create data loaders
 train_mb3_dataloader = DataLoader(train_mb3Dataset, batch_size=batch_size, shuffle=True)
-test_mb3_dataloader = DataLoader(test_mb3Dataset, batch_size=batch_size, shuffle=True)
+validation_mb3_dataloader = DataLoader(validation_mb3Dataset, batch_size=batch_size, shuffle=True)
 
 
 def print_mb3_dataloader():
     i = 0
-    for x, y in test_mb3_dataloader:
+    for x, y in validation_mb3_dataloader:
         print("batch i: ", i)
         print("x: ", x)
         print("y: ", y)
@@ -195,33 +194,33 @@ def train(dataloader, model, loss_fn, optimizer):
     return epoch_train_loss
 
 
-# define test function
-def test(dataloader, model, loss_fn):
+# define validation function
+def validation(dataloader, model, loss_fn):
     num_batches = len(dataloader)
-    print("num_batches for test: ", num_batches)
+    print("num_batches for validation: ", num_batches)
 
     model.eval()
-    test_loss, correct = 0, 0
+    validation_loss, correct = 0, 0
     with torch.no_grad():
         for x, y in dataloader:
             x, y = x.to(device), y.to(device)
             pred = model(x)
-            test_loss += loss_fn(pred, y).item()
-    test_loss /= num_batches
-    print(f"Test Error: \n Avg loss (MSE): {test_loss:>8f} \n")
-    return test_loss
+            validation_loss += loss_fn(pred, y).item()
+    validation_loss /= num_batches
+    print(f"validation Error: \n Avg loss (MSE): {validation_loss:>8f} \n")
+    return validation_loss
 
 
 train_losses = []
-test_losses = []
+validation_losses = []
 
 # Start the training
 for t in range(epochs):
     print(f"Epoch {t+1}\n-------------------------------")
-    test_loss = test(test_mb3_dataloader, model, loss_fn)
+    validation_loss = validation(validation_mb3_dataloader, model, loss_fn)
     train_loss = train(train_mb3_dataloader, model, loss_fn, optimizer)
     train_losses.append(train_loss)
-    test_losses.append(test_loss)
+    validation_losses.append(validation_loss)
 
 # plot the train losses
 plt.plot(
@@ -236,15 +235,15 @@ plt.title("Train Loss Over Epochs")
 plt.legend()
 plt.show()
 
-# plot the test losses
+# plot the validation losses
 plt.plot(
-    range(1, len(test_losses) + 1),
-    test_losses,
-    label="Test Loss (MSE)",
+    range(1, len(validation_losses) + 1),
+    validation_losses,
+    label="validation Loss (MSE)",
 )
 plt.xlabel("epoch")
 plt.ylabel("Loss")
-plt.title("Test Loss Over Epochs")
+plt.title("validation Loss Over Epochs")
 plt.legend()
 plt.show()
 
@@ -272,6 +271,3 @@ with torch.no_grad():
 
     print("regular pred: ", pred)
 
-    # right now the values testing with standardize are way off idk whats wrong might of been too learning rate
-#  ntoice the correlation between learning rate and the small or big values of the dataset
-# test loss is super high for some reason

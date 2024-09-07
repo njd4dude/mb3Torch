@@ -1,3 +1,4 @@
+# This testPredict.py takes the prediction model created in mb3.py and loads it to make predictions
 import torch
 from torch import nn
 import pickle
